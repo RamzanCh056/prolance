@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   isJumbledOrIncomplete,
   JUMBLED_JOB_MESSAGE,
@@ -337,9 +338,29 @@ const inputSchema = z.object({
 });
 
 export const generateProposal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => inputSchema.parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { jobTitle, jobDescription, clientName, freelancerName, lengthMode, includePortfolio, portfolio } = data;
+
+    const { data: profile } = await context.supabase
+      .from("profiles")
+      .select("proposal_limit")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    const planLimit = profile?.proposal_limit ?? null;
+    if (planLimit != null) {
+      const { data: usage } = await context.supabase
+        .from("proposal_usage")
+        .select("count")
+        .eq("user_id", context.userId);
+      const totalUsed = (usage ?? []).reduce((acc, row: { count?: number | null }) => acc + (row.count ?? 0), 0);
+      if (totalUsed >= planLimit) {
+        return {
+          error: "You've already used your proposal limit. Please contact your admin to continue generating proposals.",
+        } as const;
+      }
+    }
 
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {

@@ -89,13 +89,15 @@ export function useTotalProposals() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  const today = () => new Date().toISOString().slice(0, 10);
+
   const refresh = useCallback(async () => {
     if (!user) { setTotal(0); setLoading(false); return; }
     const { data } = await supabase
       .from("proposal_usage")
       .select("count")
       .eq("user_id", user.id);
-    const sum = (data ?? []).reduce((acc, r: any) => acc + (r.count ?? 0), 0);
+    const sum = (data ?? []).reduce((acc, r: { count?: number }) => acc + (r.count ?? 0), 0);
     setTotal(sum);
     setLoading(false);
   }, [user]);
@@ -114,6 +116,24 @@ export function useTotalProposals() {
     return () => { supabase.removeChannel(channel); };
   }, [isReady, user, refresh]);
 
-  return { total, loading, refresh };
+  const increment = async () => {
+    if (!user) return;
+    setTotal((t) => t + 1);
+    const date = today();
+    const { data: existing } = await supabase
+      .from("proposal_usage")
+      .select("id, count")
+      .eq("user_id", user.id)
+      .eq("usage_date", date)
+      .maybeSingle();
+    if (existing) {
+      await supabase.from("proposal_usage").update({ count: existing.count + 1 }).eq("id", existing.id);
+    } else {
+      await supabase.from("proposal_usage").insert({ user_id: user.id, usage_date: date, count: 1 });
+    }
+    await refresh();
+  };
+
+  return { total, loading, refresh, increment };
 }
 

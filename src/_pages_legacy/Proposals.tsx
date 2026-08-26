@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Sparkles, Copy, Save, RefreshCw, FileText, Loader2, Trash2, Lock, Crown,
   Briefcase, Target, CheckCircle2, TrendingUp, Building2, Rocket, User2, Users,
@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { generateProposal } from "@/lib/proposals.functions";
 import { isJumbledOrIncomplete, MAX_JOB_DESCRIPTION_CHARS } from "@/lib/job-brief";
 import { useProposals, saveProposal, deleteProposal, uid, type Proposal } from "@/lib/store";
-import { useProfile, useProposalUsage, useTotalProposals } from "@/hooks/use-profile";
+import { useProfile, useTotalProposals } from "@/hooks/use-profile";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import EmptyState from "@/components/EmptyState";
 import { cn } from "@/lib/utils";
@@ -91,9 +91,9 @@ export default function Proposals() {
   const proposals = useProposals();
   const { profile } = useProfile();
   const isPremium = true;
-  const { increment } = useProposalUsage();
-  const { total: totalProposals } = useTotalProposals();
+  const { increment, refresh: refreshTotal, total: totalProposals } = useTotalProposals();
   const { items: portfolio } = usePortfolio();
+  const generatingRef = useRef(false);
 
   const planLimit = profile?.proposal_limit ?? null;
   const remaining = planLimit != null ? Math.max(0, planLimit - totalProposals) : Infinity;
@@ -129,12 +129,20 @@ export default function Proposals() {
       });
       return;
     }
-    if (blocked) {
+    if (blocked || remaining <= 0) {
       toast.error("You've already used your proposal limit", {
-        description: "Please renew your subscription or contact your admin to continue generating proposals.",
+        description: "Please contact your admin to continue generating proposals.",
         duration: 6000,
       });
       return;
+    }
+    if (generatingRef.current) return;
+    generatingRef.current = true;
+    if (remaining === 1) {
+      toast.warning("This is your last proposal", {
+        description: "After this one, contact the admin to continue generating proposals.",
+        duration: 7000,
+      });
     }
     setLoading(true);
     setResult("");
@@ -174,7 +182,11 @@ export default function Proposals() {
           portfolio: portfolioPayload,
         },
       });
-      if ((data as any)?.error) throw new Error((data as any).error);
+      if ((data as any)?.error) {
+        const err = String((data as any).error);
+        if (/proposal limit/i.test(err)) await refreshTotal();
+        throw new Error(err);
+      }
       const d = data as any;
       setResult(d?.proposal ?? "");
       setHook(d?.hook ?? "");
@@ -213,6 +225,7 @@ export default function Proposals() {
         toast.error(msg || "Something went wrong");
       }
     } finally {
+      generatingRef.current = false;
       setLoading(false);
     }
   };
@@ -278,6 +291,20 @@ export default function Proposals() {
 
 
 
+      {remaining === 1 && !blocked && (
+        <div className="rounded-2xl border border-warning/40 bg-warning/10 p-4 flex items-start gap-3 animate-fade-in">
+          <div className="h-9 w-9 rounded-xl bg-warning/20 grid place-items-center shrink-0">
+            <Zap className="h-4 w-4 text-warning" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-warning">This is your last proposal</div>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              You have 1 proposal left. After you generate it, you will need to contact the admin to continue.
+            </p>
+          </div>
+        </div>
+      )}
+
       {blocked && (
         <div className="rounded-2xl border border-destructive/40 bg-destructive/10 p-4 flex items-start gap-3 animate-fade-in">
           <div className="h-9 w-9 rounded-xl bg-destructive/20 grid place-items-center shrink-0">
@@ -286,7 +313,7 @@ export default function Proposals() {
           <div className="min-w-0">
             <div className="text-sm font-semibold text-destructive">You've already used your proposal limit</div>
             <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-              You've generated {totalProposals} of {planLimit} proposals on your current plan. Please renew your subscription or contact your admin to continue generating new proposals.
+              You've generated {totalProposals} of {planLimit} proposals on your current plan. Please contact your admin to continue generating new proposals.
             </p>
           </div>
         </div>
@@ -370,7 +397,7 @@ export default function Proposals() {
           ) : blocked ? (
             <><Lock className="h-4 w-4 mr-2" /> Proposal limit reached</>
           ) : (
-            <><Sparkles className="h-4 w-4 mr-2" /> Generate Winning Proposal {planLimit != null ? `(${remaining} left)` : ""}</>
+            <><Sparkles className="h-4 w-4 mr-2" /> {remaining === 1 ? "Generate Last Proposal (1 left)" : `Generate Winning Proposal${planLimit != null ? ` (${remaining} left)` : ""}`}</>
           )}
         </Button>
       </div>
