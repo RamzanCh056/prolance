@@ -11,6 +11,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { AuthProvider } from "@/hooks/use-auth";
+import { useLockedDarkTheme } from "@/hooks/use-theme";
 
 import appCss from "../styles.css?url";
 
@@ -76,7 +77,7 @@ export const Route = createRootRoute({
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
         <HeadContent />
       </head>
@@ -90,6 +91,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const [queryClient] = useState(() => new QueryClient());
+  useLockedDarkTheme();
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

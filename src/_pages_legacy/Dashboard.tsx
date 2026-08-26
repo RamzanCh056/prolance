@@ -1,7 +1,27 @@
 import { Link } from "@tanstack/react-router";
-import { FileText, Users, Receipt, LayoutTemplate, ArrowRight, TrendingUp, Sparkles, Zap } from "lucide-react";
+import { FileText, Users, Receipt, LayoutTemplate, ArrowRight, TrendingUp, Sparkles, Zap, Lightbulb, ChevronRight } from "lucide-react";
 import { useClients, useInvoices, useProposals } from "@/lib/store";
 import { useProfile, useTotalProposals } from "@/hooks/use-profile";
+import { useDailyTip } from "@/hooks/use-daily-tip";
+
+function TipText({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        const bold = part.match(/^\*\*([^*]+)\*\*$/);
+        if (bold) {
+          return (
+            <span key={i} className="font-bold text-warning">
+              {bold[1]}
+            </span>
+          );
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+}
 
 export default function Dashboard() {
   const clients = useClients();
@@ -9,6 +29,7 @@ export default function Dashboard() {
   const proposals = useProposals();
   const { profile } = useProfile();
   const { total: totalProposals } = useTotalProposals();
+  const { tip, title, titleColor } = useDailyTip();
 
 
   const activeClients = clients.filter((c) => c.status === "Active").length;
@@ -25,6 +46,29 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-7">
+      {tip ? (
+        <Link
+          to="/proposals"
+          className="flex items-center gap-3 rounded-2xl glass-subtle px-3.5 py-3.5 hover:bg-white/5 transition-smooth"
+        >
+          <div className="h-10 w-10 shrink-0 rounded-full bg-warning/15 grid place-items-center shadow-[0_0_18px_hsl(var(--warning)/0.25)]">
+            <Lightbulb className="h-5 w-5 text-warning" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div
+              className="text-[10px] font-bold uppercase tracking-[0.16em]"
+              style={{ color: titleColor }}
+            >
+              {title}
+            </div>
+            <p className="text-sm leading-snug mt-0.5">
+              <TipText text={tip} />
+            </p>
+          </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
+      ) : null}
+
       {/* Greeting */}
       <section className="pt-3">
         <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/90 mb-2">

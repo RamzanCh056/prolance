@@ -276,3 +276,63 @@ export const checkUserAccess = createServerFn({ method: "POST" })
     if (Date.now() > endMs) return { status: "expired" as const };
     return { status: "ok" as const, isAdmin: false };
   });
+
+const DAILY_TIP_KEY = "daily_tip";
+const DAILY_TIP_TITLE_KEY = "daily_tip_title";
+const DAILY_TIP_TITLE_COLOR_KEY = "daily_tip_title_color";
+
+const hexColor = z
+  .string()
+  .trim()
+  .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Use a hex color like #F5C542");
+
+export const adminGetDailyTip = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: isAdmin, error: roleError } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (roleError || !isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("app_settings")
+      .select("key, value, updated_at")
+      .in("key", [DAILY_TIP_KEY, DAILY_TIP_TITLE_KEY, DAILY_TIP_TITLE_COLOR_KEY]);
+    if (error) throw new Error(error.message);
+    const map = Object.fromEntries((data ?? []).map((r) => [r.key, r]));
+    return {
+      title: map[DAILY_TIP_TITLE_KEY]?.value ?? "Today's tip",
+      titleColor: map[DAILY_TIP_TITLE_COLOR_KEY]?.value ?? "#F5C542",
+      tip: map[DAILY_TIP_KEY]?.value ?? "",
+      updatedAt: map[DAILY_TIP_KEY]?.updated_at ?? map[DAILY_TIP_TITLE_KEY]?.updated_at ?? null,
+    };
+  });
+
+export const adminSetDailyTip = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        title: z.string().trim().min(1).max(40),
+        titleColor: hexColor,
+        tip: z.string().trim().min(1).max(280),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: isAdmin, error: roleError } = await context.supabase.rpc("has_role", {
+      _user_id: context.userId,
+      _role: "admin",
+    });
+    if (roleError || !isAdmin) throw new Error("Forbidden");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const now = new Date().toISOString();
+    const { error } = await supabaseAdmin.from("app_settings").upsert([
+      { key: DAILY_TIP_TITLE_KEY, value: data.title, updated_at: now },
+      { key: DAILY_TIP_TITLE_COLOR_KEY, value: data.titleColor.toUpperCase(), updated_at: now },
+      { key: DAILY_TIP_KEY, value: data.tip, updated_at: now },
+    ]);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });

@@ -1,7 +1,7 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Loader2, Search, Trash2, Plus, CalendarIcon, Pencil, LogOut } from "lucide-react";
+import { Loader2, Search, Trash2, Plus, CalendarIcon, Pencil, LogOut, Lightbulb } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -9,11 +9,14 @@ import {
   adminDeleteUser,
   adminCreateUser,
   adminUpdateUser,
+  adminGetDailyTip,
+  adminSetDailyTip,
   type AdminUserRow,
 } from "@/lib/admin.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -84,6 +87,11 @@ function AdminPage() {
   const [ePlan, setEPlan] = useState<15 | 30>(15);
   const [eLimit, setELimit] = useState<number>(15);
 
+  const [dailyTip, setDailyTip] = useState("");
+  const [dailyTipTitle, setDailyTipTitle] = useState("Today's tip");
+  const [dailyTipTitleColor, setDailyTipTitleColor] = useState("#F5C542");
+  const [savingTip, setSavingTip] = useState(false);
+
   const openEdit = (u: AdminUserRow) => {
     setEditUser(u);
     setEName(u.display_name ?? "");
@@ -128,8 +136,16 @@ function AdminPage() {
       setUsers(res.users);
       setAdminId(res.adminUserId);
       setForbidden(false);
+      try {
+        const tipRes = await adminGetDailyTip();
+        setDailyTip(tipRes.tip ?? "");
+        setDailyTipTitle(tipRes.title || "Today's tip");
+        setDailyTipTitleColor(tipRes.titleColor || "#F5C542");
+      } catch {
+        // table may not exist yet on a fresh DB
+      }
     } catch (e: any) {
-      if (String(e?.message || "").match(/Forbidden|Unauthorized/)) {
+      if (String(e?.message || "") === "Forbidden") {
         setForbidden(true);
       } else {
         toast({ title: "Failed to load", description: e?.message ?? "Error", variant: "destructive" });
@@ -172,7 +188,8 @@ function AdminPage() {
     );
   }
 
-  if (!user || forbidden) return <Navigate to="/" replace />;
+  if (!user) return <Navigate to="/auth" replace />;
+  if (forbidden) return <Navigate to="/" replace />;
 
   const doDelete = async () => {
     if (!toDelete) return;
@@ -225,7 +242,7 @@ function AdminPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold">Admin</h1>
-            <p className="text-sm text-muted-foreground">Manage users and access.</p>
+            <p className="text-sm text-muted-foreground">Manage users, access, and daily tips.</p>
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={() => setAddOpen(true)}>
@@ -249,6 +266,97 @@ function AdminPage() {
           <StatCard label="Paid" value={stats.paid} />
           <StatCard label="Free" value={stats.free} />
           <StatCard label="New this week" value={stats.newWeek} />
+        </div>
+
+        <div className="rounded-lg border p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-full bg-warning/15 grid place-items-center">
+              <Lightbulb className="h-4 w-4 text-warning" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold">Daily tips</h2>
+              <p className="text-xs text-muted-foreground">Shown at the top of every user's home screen.</p>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Title</Label>
+            <Input
+              value={dailyTipTitle}
+              onChange={(e) => setDailyTipTitle(e.target.value)}
+              maxLength={40}
+              placeholder="Today's tip"
+            />
+            <p className="text-[11px] text-muted-foreground">{dailyTipTitle.length}/40</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Title color</Label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={/^#([0-9a-f]{6})$/i.test(dailyTipTitleColor) ? dailyTipTitleColor : "#F5C542"}
+                onChange={(e) => setDailyTipTitleColor(e.target.value.toUpperCase())}
+                className="h-10 w-12 cursor-pointer rounded-md border border-input bg-transparent p-1"
+                aria-label="Title color"
+              />
+              <Input
+                value={dailyTipTitleColor}
+                onChange={(e) => setDailyTipTitleColor(e.target.value)}
+                maxLength={7}
+                placeholder="#F5C542"
+                className="font-mono uppercase"
+              />
+            </div>
+            <div className="flex gap-1.5">
+              {["#F5C542", "#00E5FF", "#FF4D9D", "#34D399", "#FFFFFF"].map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  title={c}
+                  onClick={() => setDailyTipTitleColor(c)}
+                  className="h-6 w-6 rounded-full border border-white/20"
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground" style={{ color: dailyTipTitleColor }}>
+              Preview: {dailyTipTitle || "Today's tip"}
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Tip text</Label>
+            <Textarea
+              value={dailyTip}
+              onChange={(e) => setDailyTip(e.target.value)}
+              maxLength={280}
+              rows={3}
+              placeholder="Apply within 5 minutes of a new job post to get **3x** more views."
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Wrap a word in **double asterisks** to highlight it in yellow. {dailyTip.length}/280
+            </p>
+          </div>
+          <Button
+            disabled={savingTip || !dailyTip.trim() || !dailyTipTitle.trim()}
+            onClick={async () => {
+              setSavingTip(true);
+              try {
+                await adminSetDailyTip({
+                  data: {
+                    title: dailyTipTitle.trim(),
+                    titleColor: dailyTipTitleColor.trim(),
+                    tip: dailyTip.trim(),
+                  },
+                });
+                toast({ title: "Daily tip saved" });
+              } catch (e: any) {
+                toast({ title: "Could not save tip", description: e?.message ?? "Error", variant: "destructive" });
+              } finally {
+                setSavingTip(false);
+              }
+            }}
+          >
+            {savingTip ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Saving...</> : "Save tip"}
+          </Button>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">

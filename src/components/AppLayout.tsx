@@ -6,10 +6,7 @@ import {
   Receipt,
   Briefcase,
   Settings as SettingsIcon,
-  Moon,
-  Sun,
 } from "lucide-react";
-import { useTheme } from "@/hooks/use-theme";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -21,7 +18,6 @@ const navItems = [
 ];
 
 export default function AppLayout() {
-  const { theme, toggle } = useTheme();
   const loc = useLocation();
 
   return (
@@ -46,17 +42,6 @@ export default function AppLayout() {
             </span>
           </Link>
           <div className="flex items-center gap-1">
-            <button
-              onClick={toggle}
-              aria-label="Toggle theme"
-              className="h-9 w-9 rounded-full grid place-items-center hover:bg-muted transition-smooth"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-[18px] w-[18px]" />
-              ) : (
-                <Moon className="h-[18px] w-[18px]" />
-              )}
-            </button>
             <Link
               to="/settings"
               aria-label="Settings"

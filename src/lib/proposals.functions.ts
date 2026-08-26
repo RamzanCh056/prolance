@@ -1,5 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import {
+  isJumbledOrIncomplete,
+  JUMBLED_JOB_MESSAGE,
+  JOB_DESCRIPTION_TOO_LONG,
+  MAX_JOB_DESCRIPTION_CHARS,
+} from "@/lib/job-brief";
 
 const LENGTH_MODES = ["Short", "Standard", "Detailed"] as const;
 type LengthMode = (typeof LENGTH_MODES)[number];
@@ -309,8 +315,8 @@ function detectCoreProblem(text: string): string {
 }
 
 const inputSchema = z.object({
-  jobTitle: z.string().min(1).max(200),
-  jobDescription: z.string().min(1).max(4000),
+  jobTitle: z.string().min(1).max(200, { message: "Job title is too long. Please shorten it." }),
+  jobDescription: z.string().min(1).max(MAX_JOB_DESCRIPTION_CHARS, { message: JOB_DESCRIPTION_TOO_LONG }),
   clientName: z.string().max(120).optional().default(""),
   freelancerName: z.string().max(120).optional().default(""),
   lengthMode: z.enum(LENGTH_MODES).default("Standard"),
@@ -338,6 +344,10 @@ export const generateProposal = createServerFn({ method: "POST" })
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
       return { error: "Couldn't generate proposal — please try again." } as const;
+    }
+
+    if (isJumbledOrIncomplete(jobTitle, jobDescription)) {
+      return { error: JUMBLED_JOB_MESSAGE } as const;
     }
 
     const jobText = `${jobTitle}\n${jobDescription}`;

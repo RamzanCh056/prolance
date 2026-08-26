@@ -1,6 +1,5 @@
-import { Moon, Sun, LogOut, Crown, Mail, Clock } from "lucide-react";
+import { LogOut, Crown, Mail, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useTheme } from "@/hooks/use-theme";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth";
 import { useProfile } from "@/hooks/use-profile";
@@ -31,7 +30,6 @@ function formatRemaining(endMs: number, now: number): { label: string; expired: 
 }
 
 export default function Settings() {
-  const { theme, toggle } = useTheme();
   const { user, signOut } = useAuth();
   const { profile, isPremium } = useProfile();
   const nav = useNavigate();
@@ -105,20 +103,6 @@ export default function Settings() {
 
       {/* Settings list */}
       <div className="rounded-2xl border border-border/60 bg-card divide-y divide-border overflow-hidden">
-        <Row
-          icon={theme === "dark" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-          title="Appearance"
-          desc={theme === "dark" ? "Dark mode" : "Light mode"}
-          action={
-            <button
-              onClick={toggle}
-              className={`relative h-7 w-12 rounded-full transition-smooth ${theme === "dark" ? "bg-gradient-primary" : "bg-muted"}`}
-              aria-label="Toggle theme"
-            >
-              <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow-md transition-spring ${theme === "dark" ? "left-[22px]" : "left-0.5"}`} />
-            </button>
-          }
-        />
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <button
@@ -153,19 +137,6 @@ export default function Settings() {
       </div>
 
       <p className="text-center text-xs text-muted-foreground pt-2">Prolance · v1.1</p>
-    </div>
-  );
-}
-
-function Row({ icon, title, desc, action }: { icon: React.ReactNode; title: string; desc: string; action?: React.ReactNode }) {
-  return (
-    <div className="flex items-center gap-3 px-4 py-3.5">
-      <div className="h-9 w-9 rounded-xl bg-gradient-soft text-primary grid place-items-center">{icon}</div>
-      <div className="flex-1 min-w-0">
-        <div className="font-semibold text-sm">{title}</div>
-        <div className="text-xs text-muted-foreground truncate">{desc}</div>
-      </div>
-      {action}
     </div>
   );
 }

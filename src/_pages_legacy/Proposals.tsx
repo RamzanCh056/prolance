@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { generateProposal } from "@/lib/proposals.functions";
+import { isJumbledOrIncomplete, MAX_JOB_DESCRIPTION_CHARS } from "@/lib/job-brief";
 import { useProposals, saveProposal, deleteProposal, uid, type Proposal } from "@/lib/store";
 import { useProfile, useProposalUsage, useTotalProposals } from "@/hooks/use-profile";
 import { usePortfolio } from "@/hooks/use-portfolio";
@@ -113,6 +114,21 @@ export default function Proposals() {
       toast.error("Add a job title and description first.");
       return;
     }
+    if (jobDescription.trim().length > MAX_JOB_DESCRIPTION_CHARS) {
+      toast.error("Description is too big", {
+        description: "Kindly paste only the useful description from the job.",
+        duration: 8000,
+      });
+      return;
+    }
+    if (isJumbledOrIncomplete(jobTitle, jobDescription)) {
+      toast.error("It looks like that message was jumbled or incomplete!", {
+        description:
+          "Please paste the Job Title and Job Description here, and I'll immediately craft a high-converting, tailored Upwork proposal for you using.",
+        duration: 8000,
+      });
+      return;
+    }
     if (blocked) {
       toast.error("You've already used your proposal limit", {
         description: "Please renew your subscription or contact your admin to continue generating proposals.",
@@ -187,7 +203,15 @@ export default function Proposals() {
       }
       toast.success("Proposal ready ✨");
     } catch (e: any) {
-      toast.error(e?.message ?? "Something went wrong");
+      const msg = String(e?.message ?? "");
+      if (msg.includes("too_big") && msg.includes("jobDescription")) {
+        toast.error("Description is too big", {
+          description: "Kindly paste only the useful description from the job.",
+          duration: 8000,
+        });
+      } else {
+        toast.error(msg || "Something went wrong");
+      }
     } finally {
       setLoading(false);
     }
